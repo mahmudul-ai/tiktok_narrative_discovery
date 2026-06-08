@@ -1,0 +1,9 @@
+.vscode
+src/test_gpu.py
+data/videos_en/*
+data/raw_metadata/*
+data/processed/*
+outputs/embeddings/*
+outputs/clusters/*
+outputs/labels/*
+outputs/representatives/*
