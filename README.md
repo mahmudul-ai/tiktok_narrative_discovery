@@ -14,13 +14,13 @@ Most conventional approaches follow a text-first pipeline:
 video → transcript/caption → text embedding/topic model → topics
 ```
 
-This project instead follows a video-native pipeline:
+This project currently follows:
 
 ```text
-MP4 video → video encoder → video embedding → UMAP → HDBSCAN → representative videos → narrative interpretation
+MP4 video → VideoMAE embedding → UMAP → HDBSCAN → representative videos
 ```
 
-The first proof-of-concept uses only English MP4 files. Metadata is used for tracking, validation, and post-hoc interpretation, but not for clustering.
+Metadata is used for dataset preparation and tracking but is not used during clustering.
 
 ---
 
@@ -29,9 +29,9 @@ The first proof-of-concept uses only English MP4 files. Metadata is used for tra
 ```text
 English TikTok MP4 files
         ↓
-Metadata merging and validation
+Metadata merging
         ↓
-Video readability validation
+Video validation
         ↓
 VideoMAE embedding extraction
         ↓
@@ -42,8 +42,6 @@ UMAP dimensionality reduction
 HDBSCAN clustering
         ↓
 Representative video selection
-        ↓
-Manual / VLM-assisted narrative interpretation
 ```
 
 ---
@@ -97,7 +95,7 @@ The current implementation assumes:
 data/videos_en/
 ```
 
-3. Metadata is stored as multiple CSV files in:
+3. Metadata is stored as CSV files in:
 
 ```text
 data/raw_metadata/
@@ -134,16 +132,14 @@ Example:
 data/videos_en/1234567890.mp4
 ```
 
-If your video filenames follow a different pattern, update the path-matching logic in `src/01_merge_metadata.py`.
-
 ---
 
 ## Environment Setup
 
-Create a new Conda environment:
+Create a Conda environment:
 
 ```bash
-conda create -n tiktok python=3.12 -y
+conda create -n tiktok python=3.10 -y
 conda activate tiktok
 ```
 
@@ -177,7 +173,7 @@ If CUDA is unavailable, embedding extraction will run on CPU and may be very slo
 
 ### Step 1: Merge Metadata
 
-This script merges multiple metadata CSV files, removes duplicate TikTok IDs, creates expected video paths, and checks whether the corresponding MP4 files exist.
+Merge metadata CSV files, remove duplicate IDs, and verify that corresponding video files exist.
 
 ```bash
 python src/01_merge_metadata.py
@@ -305,8 +301,6 @@ outputs/clusters/en_umap_15d_for_clustering.npy
 outputs/figures/en_umap_2d_video_only.png
 ```
 
-The 2D plot is useful for visually inspecting whether videos form meaningful groups.
-
 ---
 
 ### Step 6: Run HDBSCAN Clustering
@@ -396,9 +390,7 @@ outputs/representatives/
 └── en_cluster_representatives.csv
 ```
 
-Each cluster folder contains the most central videos for that cluster. These are used for manual or VLM-assisted narrative interpretation.
-
-Small cosine distances are expected for representative videos because they are selected to be close to the cluster centroid.
+These videos are intended for cluster inspection and interpretation.
 
 ---
 
@@ -414,54 +406,6 @@ Output:
 
 ```text
 outputs/clusters/en_cluster_review_sheet.csv
-```
-
-This file can be used by the research team to assign:
-
-```text
-manual_narrative_label
-manual_notes
-cluster coherence
-visual motifs
-emotional framing
-political interpretation
-```
-
----
-
-## Recommended Manual Review Protocol
-
-For each discovered cluster:
-
-1. Open the representative videos.
-2. Watch the top 5 to 10 representatives.
-3. Assign a short narrative label.
-4. Record recurring visual motifs.
-5. Record emotional framing.
-6. Note whether the cluster appears coherent or mostly stylistic.
-7. Mark confidence as high, medium, or low.
-
-Suggested fields:
-
-```text
-cluster_id
-narrative_label
-narrative_summary
-visual_motifs
-emotional_framing
-strategic_frame
-confidence
-notes
-```
-
-Example:
-
-```text
-Cluster 4
-Narrative label: China as a technological leader
-Visual motifs: high-speed rail, cities, factories, robotics
-Emotional framing: admiration, pride, futurism
-Confidence: high
 ```
 
 ---
@@ -482,75 +426,15 @@ VideoMAE is accessible, GPU-compatible, and suitable for extracting visual-tempo
 
 ### Why UMAP?
 
-UMAP helps reduce high-dimensional embeddings into a space suitable for visualization and clustering.
+UMAP reduces embedding dimensionality for visualization and clustering.
 
 ### Why HDBSCAN?
 
-HDBSCAN does not require specifying the number of clusters in advance and can mark uncertain videos as noise. This is appropriate for messy social media data.
+HDBSCAN does not require specifying the number of clusters in advance and can identify outliers as noise.
 
-### Why representative videos?
+### Why Representative Videos?
 
-Instead of interpreting thousands of videos individually, the system selects representative examples from each cluster. This makes expert interpretation scalable.
-
----
-
-## Current Research Contribution
-
-The current version is a pipeline/system contribution:
-
-> A video-native unsupervised narrative discovery pipeline for TikTok videos that clusters short-form political content directly in video representation space rather than through transcript-first topic modeling.
-
-This can support a computational social science paper if paired with expert validation and narrative interpretation.
-
----
-
-## Potential Extensions
-
-### 1. Text baseline
-
-Use `title`, `description`, and `tags` to create a text-only clustering baseline.
-
-```text
-title/description/tags → sentence embeddings → UMAP → HDBSCAN
-```
-
-This allows comparison against the video-only pipeline.
-
-### 2. Metadata-based post-hoc analysis
-
-Use metadata after clustering to analyze:
-
-```text
-uploader distribution
-engagement statistics
-upload-date patterns
-common tags
-common descriptions
-```
-
-### 3. Cross-language extension
-
-After English proof of concept:
-
-```text
-English → Chinese → Japanese
-```
-
-This can reveal whether similar narrative structures appear across languages.
-
-### 4. Narrative-aware representation learning
-
-Use high-confidence clusters as pseudo-labels to train a small projection head for better narrative separation.
-
-```text
-initial clusters → pseudo-labels → projection head → refined embeddings → reclustering
-```
-
-This would move the project toward algorithmic novelty.
-
-### 5. Visual motif extraction
-
-Use representative frames or VLM-assisted interpretation to identify recurring visual symbols within each cluster.
+Representative videos provide a compact way to inspect cluster contents without reviewing every video.
 
 ---
 
@@ -595,28 +479,16 @@ Small cosine distances for representative videos are normal because they are sel
 
 ## Reproducibility Notes
 
-For reproducibility, record:
+Record the following when running experiments:
 
 ```text
 number of videos
 number of successfully embedded videos
-VideoMAE model name
+VideoMAE model
 UMAP parameters
 HDBSCAN parameters
 number of clusters
 noise ratio
-manual interpretation protocol
-```
-
-Recommended parameters to document:
-
-```text
-NUM_FRAMES
-UMAP n_neighbors
-UMAP n_components
-UMAP min_dist
-HDBSCAN min_cluster_size
-HDBSCAN min_samples
 ```
 
 ---
